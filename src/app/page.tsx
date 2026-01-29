@@ -1,65 +1,74 @@
-import Image from "next/image";
+"use client";
+import { BookText, MoreHorizontal, Plus, Search } from 'lucide-react';
+import dynamic from 'next/dynamic';
+import { useState } from 'react';
 
-export default function Home() {
+// 关键：动态导入阅读器，禁用服务端渲染
+const EpubViewer = dynamic(() => import('@/components/EpubViewer'), { ssr: false });
+
+export default function Library() {
+  const [fileData, setFileData] = useState<ArrayBuffer | null>(null);
+
+  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onload = (ev) => setFileData(ev.target?.result as ArrayBuffer);
+      reader.readAsArrayBuffer(file);
+    }
+  };
+
+  if (fileData) {
+    return (
+      <div className="relative h-screen w-full bg-white">
+        <button 
+          onClick={() => setFileData(null)}
+          className="absolute top-4 left-4 z-50 px-4 py-2 bg-white/80 backdrop-blur rounded-full border shadow-sm text-sm"
+        >
+          返回书库
+        </button>
+        <EpubViewer data={fileData} />
+      </div>
+    );
+  }
+
   return (
-    <div className="flex min-h-screen items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex min-h-screen w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the page.tsx file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <div className="max-w-md mx-auto min-h-screen bg-white flex flex-col font-sans">
+      {/* 顶部状态栏占位 & 标题 */}
+      <header className="p-6 flex justify-between items-center">
+        <h1 className="text-3xl font-bold tracking-tight">书库</h1>
+        <div className="flex gap-3">
+          <button className="p-2 bg-gray-100 rounded-full"><BookText size={20} /></button>
+          <button className="p-2 bg-gray-100 rounded-full"><MoreHorizontal size={20} /></button>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={16}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+      </header>
+
+      {/* 书架区域 */}
+      <main className="flex-1 px-6 pt-10 flex flex-col items-center">
+        <label className="group relative w-44 h-64 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-black transition-colors">
+          <Plus size={40} className="text-gray-300 group-hover:text-black" />
+          <span className="mt-4 text-xs text-gray-400">导入 EPUB</span>
+          <input type="file" accept=".epub" className="hidden" onChange={handleFile} />
+        </label>
+        
+        <div className="mt-8 text-center text-gray-400 text-sm">
+          <p>1 本书</p>
+          <p className="mt-1">正在导入：1/1。失败：0</p>
         </div>
       </main>
+
+      {/* 底部导航 */}
+      <nav className="h-24 border-t flex justify-around items-center px-10 pb-6">
+        <div className="flex flex-col items-center gap-1 text-gray-400">
+          <Plus size={24} /> <span className="text-[10px]">主页</span>
+        </div>
+        <div className="flex flex-col items-center gap-1 text-black">
+          <BookText size={24} /> <span className="text-[10px]">书库</span>
+        </div>
+        <div className="absolute right-8 bottom-28 p-4 bg-gray-100 rounded-full shadow-lg">
+          <Search size={24} />
+        </div>
+      </nav>
     </div>
   );
 }
