@@ -1,73 +1,93 @@
 "use client";
-import { BookText, MoreHorizontal, Plus, Search } from 'lucide-react';
-import dynamic from 'next/dynamic';
+import { db } from '@/lib/db';
+import { useLiveQuery } from 'dexie-react-hooks';
+import ePub from 'epubjs';
+import { BookText, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
+import Link from 'next/link';
 import { useState } from 'react';
 
-// 关键：动态导入阅读器，禁用服务端渲染
-const EpubViewer = dynamic(() => import('@/components/EpubViewer'), { ssr: false });
+export default function LibraryPage() {
+  const [activeTab, setActiveTab] = useState<'home' | 'library'>('home');
+  const allBooks = useLiveQuery(() => db.books.toArray()) || [];
 
-export default function Library() {
-  const [fileData, setFileData] = useState<ArrayBuffer | null>(null);
-
-  const handleFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (ev) => setFileData(ev.target?.result as ArrayBuffer);
-      reader.readAsArrayBuffer(file);
-    }
+    if (!file) return;
+
+    const buffer = await file.arrayBuffer();
+    const bookInstance = ePub(buffer);
+    
+    // 提取封面图
+    let coverData = '';
+    try {
+      const coverUrl = await bookInstance.coverUrl();
+      if (coverUrl) coverData = coverUrl;
+    } catch (e) { console.error("封面解析失败"); }
+
+    await db.books.add({
+      title: file.name.replace('.epub', ''),
+      data: buffer,
+      cover: coverData,
+      format: 'epub',
+      category: 'local'
+    });
+    setActiveTab('library');
   };
 
-  if (fileData) {
-    return (
-      <div className="relative h-screen w-full bg-white">
-        <button 
-          onClick={() => setFileData(null)}
-          className="absolute top-4 left-4 z-50 px-4 py-2 bg-white/80 backdrop-blur rounded-full border shadow-sm text-sm"
-        >
-          返回书库
-        </button>
-        <EpubViewer data={fileData} />
-      </div>
-    );
-  }
-
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-white flex flex-col font-sans">
-      {/* 顶部状态栏占位 & 标题 */}
+    <div className="flex flex-col min-h-screen bg-[#F9F9F9]">
       <header className="p-6 flex justify-between items-center">
-        <h1 className="text-3xl font-bold tracking-tight">书库</h1>
-        <div className="flex gap-3">
-          <button className="p-2 bg-gray-100 rounded-full"><BookText size={20} /></button>
-          <button className="p-2 bg-gray-100 rounded-full"><MoreHorizontal size={20} /></button>
+        <h1 className="text-3xl font-bold">书库</h1>
+        <div className="flex gap-2">
+          <button className="p-2 bg-white rounded-full shadow-sm border"><BookText size={20} /></button>
+          <button className="p-2 bg-white rounded-full shadow-sm border"><MoreHorizontal size={20} /></button>
         </div>
       </header>
 
-      {/* 书架区域 */}
-      <main className="flex-1 px-6 pt-10 flex flex-col items-center">
-        <label className="group relative w-44 h-64 bg-gray-50 border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:border-black transition-colors">
-          <Plus size={40} className="text-gray-300 group-hover:text-black" />
-          <span className="mt-4 text-xs text-gray-400">导入 EPUB</span>
-          <input type="file" accept=".epub" className="hidden" onChange={handleFile} />
-        </label>
-        
-        <div className="mt-8 text-center text-gray-400 text-sm">
-          <p>1 本书</p>
-          <p className="mt-1">正在导入：1/1。失败：0</p>
-        </div>
+      <main className="flex-1 px-6 pb-32">
+        {activeTab === 'home' ? (
+          <div className="flex flex-col items-center pt-10">
+            <label className="w-44 h-64 border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center cursor-pointer hover:bg-white transition-all group">
+              <Plus size={40} className="text-gray-300 group-hover:text-black" />
+              <span className="mt-4 text-xs text-gray-400">导入 EPUB</span>
+              <input type="file" accept=".epub" className="hidden" onChange={handleImport} />
+            </label>
+            <p className="mt-8 text-xs text-gray-400">{allBooks.length} 本书</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-6">
+            {allBooks.map(book => (
+              <div key={book.id} className="relative group animate-in fade-in zoom-in duration-300">
+                <Link href={`/reader?id=${book.id}`}>
+                  <div className="aspect-[3/4] bg-white rounded shadow-md overflow-hidden border border-gray-100 active:scale-95 transition-transform flex items-center justify-center">
+                    {book.cover ? (
+                      <img src={book.cover} className="w-full h-full object-cover" alt="" />
+                    ) : (
+                      <span className="text-xs text-gray-400 p-2 text-center">{book.title}</span>
+                    )}
+                  </div>
+                </Link>
+                <button 
+                  onClick={() => db.books.delete(book.id!)}
+                  className="absolute -top-2 -right-2 bg-black text-white p-1 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+                >
+                  <Trash2 size={12} />
+                </button>
+                <p className="mt-2 text-[10px] text-gray-400 truncate">{book.title}</p>
+              </div>
+            ))}
+          </div>
+        )}
       </main>
 
-      {/* 底部导航 */}
-      <nav className="h-24 border-t flex justify-around items-center px-10 pb-6">
-        <div className="flex flex-col items-center gap-1 text-gray-400">
-          <Plus size={24} /> <span className="text-[10px]">主页</span>
-        </div>
-        <div className="flex flex-col items-center gap-1 text-black">
-          <BookText size={24} /> <span className="text-[10px]">书库</span>
-        </div>
-        <div className="absolute right-8 bottom-28 p-4 bg-gray-100 rounded-full shadow-lg">
-          <Search size={24} />
-        </div>
+      <nav className="fixed bottom-0 w-full h-24 bg-white/80 backdrop-blur-md border-t flex justify-around items-center pb-6 z-50">
+        <button onClick={() => setActiveTab('home')} className={`flex flex-col items-center gap-1 ${activeTab === 'home' ? 'text-black' : 'text-gray-300'}`}>
+          <Plus size={26} /><span className="text-[10px]">主页</span>
+        </button>
+        <button onClick={() => setActiveTab('library')} className={`flex flex-col items-center gap-1 ${activeTab === 'library' ? 'text-black' : 'text-gray-300'}`}>
+          <BookText size={26} /><span className="text-[10px]">书库</span>
+        </button>
+        <div className="absolute right-8 bottom-28 p-4 bg-white shadow-xl rounded-full border border-gray-50"><Search size={22} /></div>
       </nav>
     </div>
   );
