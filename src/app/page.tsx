@@ -1,11 +1,11 @@
 "use client";
 import { db } from '@/lib/db';
+import { blobToBase64 } from '@/lib/utils';
 import { useLiveQuery } from 'dexie-react-hooks';
 import ePub from 'epubjs';
 import { BookText, MoreHorizontal, Plus, Search, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { useState } from 'react';
-
 export default function LibraryPage() {
   // 控制“主页（导入）”和“书库（展示）”的视图切换
   const [activeTab, setActiveTab] = useState<'home' | 'library'>('home');
@@ -18,44 +18,53 @@ export default function LibraryPage() {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // 1. 生成待查书名
+    // 1. 生成书名并检查重复
     const bookTitle = file.name.replace('.epub', '');
-
-    // 2. 过滤逻辑：在数据库中按标题查找
-    // db.books 已经在 lib/db.ts 中为 title 建立了索引
     const isDuplicate = await db.books.where('title').equals(bookTitle).first();
     
     if (isDuplicate) {
-      alert(`书籍《${bookTitle}》已在书库中，无需重复导入。`);
-      // 重置 input 以便下次选择同一文件也能触发 change
-      e.target.value = '';
-      return; 
+      alert(`书籍《${bookTitle}》已在书库中。`);
+      e.target.value = ''; // 清空 input 确保下次选同名文件能触发
+      return;
     }
 
-    // 3. 解析书籍数据
-    const buffer = await file.arrayBuffer();
-    const bookInstance = ePub(buffer);
-    
-    // 4. 提取封面图片路径
-    let coverData = '';
     try {
+      // 2. 将文件转为 ArrayBuffer 供 Epub.js 解析
+      const buffer = await file.arrayBuffer();
+      const bookInstance = ePub(buffer);
+      
+      let coverData = '';
+      
+      // 3. 提取并持久化封面数据
+      await bookInstance.ready; // 确保书籍已加载完毕
       const coverUrl = await bookInstance.coverUrl();
-      if (coverUrl) coverData = coverUrl;
-    } catch (err) {
-      console.error("封面解析失败", err);
-    }
+      
+      if (coverUrl) {
+        // 关键：将临时的 blob: 链接转为永久的 base64 字符串
+        coverData = await blobToBase64(coverUrl);
+      }
+      
+      // 释放 Epub.js 实例资源，避免 404 报错和内存占用
+      bookInstance.destroy();
 
-    // 5. 存入本地数据库
-    await db.books.add({
-      title: bookTitle,
-      data: buffer,
-      cover: coverData,
-      format: 'epub',
-      category: 'local'
-    });
-    
-    // 6. 成功后自动切换到书库视图展示
-    setActiveTab('library');
+      // 4. 将书籍完整数据存入数据库
+      await db.books.add({
+        title: bookTitle,
+        data: buffer,
+        cover: coverData, // 这里现在存的是永久字符串
+        format: 'epub',
+        category: 'local'
+      });
+
+      // 5. 成功后跳转至书库视图
+      setActiveTab('library');
+      
+    } catch (err) {
+      console.error("导入失败:", err);
+      alert("解析书籍失败，请检查文件格式。");
+    } finally {
+      e.target.value = ''; // 无论成功失败都重置 input
+    }
   };
 
   return (
@@ -95,7 +104,7 @@ export default function LibraryPage() {
             {allBooks.map((book) => (
               <div key={book.id} className="relative group">
                 <Link href={`/reader?id=${book.id}`}>
-                  <div className="aspect-[3/4] bg-white rounded-sm shadow-[0_10px_30px_rgba(0,0,0,0.08)] border border-gray-100 flex items-center justify-center overflow-hidden active:scale-95 transition-transform">
+                  <div className="aspect-3/4 bg-white rounded-sm shadow-[0_10px_30px_rgba(0,0,0,0.08)] border border-gray-100 flex items-center justify-center overflow-hidden active:scale-95 transition-transform">
                     {book.cover ? (
                       <img src={book.cover} className="w-full h-full object-cover" alt="" />
                     ) : (
@@ -108,7 +117,7 @@ export default function LibraryPage() {
                 {/* 删除功能 */}
                 <button 
                   onClick={() => db.books.delete(book.id!)}
-                  className="absolute -top-2 -right-2 bg-black text-white p-1.5 rounded-full shadow-lg opacity-0 group-hover:opacity-100 transition-opacity z-10"
+                  className="absolute -top-2 -right-2 bg-black text-white p-1.5 rounded-full shadow-lg group-hover:opacity-100 transition-opacity z-10"
                 >
                   <Trash2 size={12} />
                 </button>
