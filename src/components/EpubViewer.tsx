@@ -25,33 +25,45 @@ export default function EpubViewer({ data }: Props) {
         url={data}
         location={location}
         locationChanged={(cfi: string) => setLocation(cfi)}
+        swipeable={true}
         getRendition={(rendition) => {
           renditionRef.current = rendition;
-
-          // --- 滑动翻页逻辑开始 ---
-          let touchStartX = 0;
-          let touchEndX = 0;
-
-          // 监听 iframe 内部的触摸开始
-          rendition.on('touchstart', (event: TouchEvent) => {
-            touchStartX = event.changedTouches[0].screenX;
+        
+          let startX = 0;
+          let isMouseDown = false; // 标记鼠标是否按下
+        
+          // --- 处理逻辑：判断方向并翻页 ---
+          const handleEnd = (endX: number) => {
+            const distance = endX - startX;
+            if (distance < -50) rendition.next();
+            else if (distance > 50) rendition.prev();
+          };
+        
+          // 1. 兼容移动端触摸
+          rendition.on('touchstart', (e: TouchEvent) => {
+            startX = e.changedTouches[0].screenX;
           });
-
-          // 监听 iframe 内部的触摸结束
-          rendition.on('touchend', (event: TouchEvent) => {
-            touchEndX = event.changedTouches[0].screenX;
-            const distance = touchEndX - touchStartX;
-
-            // 设定阈值（例如 50px），防止过于敏感的误触
-            if (distance < -50) {
-              // 向左滑 -> 下一页
-              rendition.next();
-            } else if (distance > 50) {
-              // 向右滑 -> 上一页
-              rendition.prev();
-            }
+          rendition.on('touchend', (e: TouchEvent) => {
+            handleEnd(e.changedTouches[0].screenX);
           });
-          // --- 滑动翻页逻辑结束 ---
+        
+          // // 2. 兼容电脑端鼠标拖动
+          // rendition.on('mousedown', (e: MouseEvent) => {
+          //   startX = e.screenX;
+          //   isMouseDown = true;
+          // });
+        
+          // rendition.on('mouseup', (e: MouseEvent) => {
+          //   if (isMouseDown) {
+          //     handleEnd(e.screenX);
+          //     isMouseDown = false;
+          //   }
+          // });
+        
+          // // 兜底：如果鼠标移出书籍区域，重置状态
+          // rendition.on('mouseleave', () => {
+          //   isMouseDown = false;
+          // });
         }}
         epubOptions={{ 
           flow: 'paginated', 
