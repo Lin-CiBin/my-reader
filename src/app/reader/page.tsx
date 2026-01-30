@@ -23,7 +23,7 @@ function ReaderContent() {
     <div className="h-screen w-full relative">
       <button 
         onClick={() => window.history.back()}
-        className="absolute top-10 left-6 z-50 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm text-xs"
+        className="absolute top-3 right-6 z-50 px-4 py-2 bg-white/80 backdrop-blur rounded-full shadow-sm text-xs"
       >
         退出阅读
       </button>
