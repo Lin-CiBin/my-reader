@@ -23,6 +23,28 @@ const getReaderStyles = (isDark: boolean) => ({
     backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
     transition: 'background-color 0.5s',
   },
+  arrow: {
+    ...ReactReaderStyle.arrow,
+    display: 'none', // 彻底隐藏
+  },
+  arrowHover: {
+    ...ReactReaderStyle.arrowHover,
+    display: 'none',
+  },
+  // 展开后的目录区域样式
+  tocArea: {
+    ...ReactReaderStyle.tocArea,
+    backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+    color: isDark ? '#ccc' : '#333',
+    transition: 'background-color 0.5s',
+  },
+
+  // 目录内的列表项样式
+  tocAreaButton: {
+    ...ReactReaderStyle.tocAreaButton,
+    color: isDark ? '#8f8f8f' : '#333',
+    borderBottom: `1px solid ${isDark ? '#333333' : '#eeeeee'}`,
+  }
 });
 export default function EpubViewer({ data, bookId, initialLocation }: Props) {
   // 初始化位置为传入的 initialLocation 或 0
@@ -31,6 +53,7 @@ export default function EpubViewer({ data, bookId, initialLocation }: Props) {
   const { resolvedTheme } = useAppTheme(); // 获取当前视觉主题
   // 使用 Hook 监听 resolvedTheme 并操作电子书内部样式
   useReaderTheme(renditionRef);
+  useReaderEvents(renditionRef, resolvedTheme);
   // 4. 关键：监听 initialLocation 的变化（处理异步加载）
   useEffect(() => {
     if (initialLocation) {
@@ -57,15 +80,14 @@ export default function EpubViewer({ data, bookId, initialLocation }: Props) {
       </div>
     );
   }
-  useReaderEvents(renditionRef, resolvedTheme);
   return (
     <div className={"h-screen w-full overflow-hidden"}>
-     <ReactReader
+      <ReactReader
         url={data}
         location={location}
         locationChanged={handleLocationChanged}
         swipeable={true}
-        readerStyles={ getReaderStyles(resolvedTheme === 'dark') }
+        readerStyles={getReaderStyles(resolvedTheme === 'dark')}
         getRendition={(rendition) => {
           renditionRef.current = rendition;
           // 💡 关键：当 rendition 第一次加载时，强制注入当前主题
