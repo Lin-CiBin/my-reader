@@ -10,43 +10,57 @@ interface Props {
   bookId: number;           // 2. 新增：必须传入 ID 才知道存给谁
   initialLocation?: string; // 3. 新增：传入上次读取的位置
 }
-
-const getReaderStyles = (isDark: boolean) => ({
-  ...ReactReaderStyle,
-  container: {
-    ...ReactReaderStyle.container,
-    backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
-    transition: 'background-color 0.5s',
-  },
-  readerArea: {
-    ...ReactReaderStyle.readerArea,
-    backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
-    transition: 'background-color 0.5s',
-  },
-  arrow: {
-    ...ReactReaderStyle.arrow,
-    display: 'none', // 彻底隐藏
-  },
-  arrowHover: {
-    ...ReactReaderStyle.arrowHover,
-    display: 'none',
-  },
-  // 展开后的目录区域样式
-  tocArea: {
-    ...ReactReaderStyle.tocArea,
-    backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
-    color: isDark ? '#ccc' : '#333',
-    transition: 'background-color 0.5s',
-  },
-
-  // 目录内的列表项样式
-  tocAreaButton: {
-    ...ReactReaderStyle.tocAreaButton,
-    color: isDark ? '#8f8f8f' : '#333',
-    borderBottom: `1px solid ${isDark ? '#333333' : '#eeeeee'}`,
-  }
-});
 export default function EpubViewer({ data, bookId, initialLocation }: Props) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    // 判断逻辑：支持触摸屏 且 宽度小于 1024px (常见 iPad Pro 以下尺寸)
+    const checkMobile = () => {
+      const isTouch = window.matchMedia("(pointer: coarse)").matches;
+      const isSmallScreen = window.innerWidth < 1024;
+      setIsMobile(isTouch || isSmallScreen);
+    };
+
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+  const getReaderStyles = (isDark: boolean) => ({
+    ...ReactReaderStyle,
+    container: {
+      ...ReactReaderStyle.container,
+      backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+      transition: 'background-color 0.5s',
+    },
+    readerArea: {
+      ...ReactReaderStyle.readerArea,
+      backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+      transition: 'background-color 0.5s',
+    },
+    arrow: {
+      ...ReactReaderStyle.arrow,
+      // 如果是移动端则隐藏，PC端则保持原样（或者自定义样式）
+      display: isMobile ? 'none' : 'block',
+    },
+    arrowHover: {
+      ...ReactReaderStyle.arrowHover,
+      display: isMobile ? 'none' : 'block',
+    },
+    // 展开后的目录区域样式
+    tocArea: {
+      ...ReactReaderStyle.tocArea,
+      backgroundColor: isDark ? '#1a1a1a' : '#ffffff',
+      color: isDark ? '#ccc' : '#333',
+      transition: 'background-color 0.5s',
+    },
+
+    // 目录内的列表项样式
+    tocAreaButton: {
+      ...ReactReaderStyle.tocAreaButton,
+      color: isDark ? '#8f8f8f' : '#333',
+      borderBottom: `1px solid ${isDark ? '#333333' : '#eeeeee'}`,
+    }
+  });
   // 初始化位置为传入的 initialLocation 或 0
   const [location, setLocation] = useState<string | number>(initialLocation || 0);
   const renditionRef = useRef<any>(null);
